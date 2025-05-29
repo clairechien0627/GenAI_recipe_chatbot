@@ -118,10 +118,25 @@
     color:            var(--body-text-color);
 }
 
+.chat-title a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.chat-title a:hover {
+    text-decoration: underline;
+}
+
 .chat-desc {
     margin:           0 0 12px;
     font-size:        1rem;
     color:            var(--body-text-color-secondary);
+}
+
+.pagination-info {
+    text-align: center;
+    margin-bottom: 10px;
+    font-weight: bold;
 }
 
 .image-gallery {
@@ -276,6 +291,15 @@
     white-space: nowrap;
 }
 
+.match-title a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.match-title a:hover {
+    text-decoration: underline;
+}
+
 .match-desc {
     margin: 0;
     font-size: 1rem;
@@ -320,6 +344,15 @@
     margin:           0 0 8px;
     font-size:        1.25rem;
     color:            var(--body-text-color);
+}
+
+.rag-title a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.rag-title a:hover {
+    text-decoration: underline;
 }
 
 .rag-desc {

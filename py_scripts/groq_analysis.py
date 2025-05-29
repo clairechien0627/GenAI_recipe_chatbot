@@ -4,8 +4,7 @@ from groq import Groq
 import re
 
 client = Groq()
-model = "llama3-8b-8192"
-
+model_name = "llama3-8b-8192"
 
 def set_env(var: str):
     if not os.environ.get(var):
@@ -15,7 +14,7 @@ def generate_true_false(recipe, question):
     system_prompt = """
     你是一位專業且經驗豐富的廚師，擅長分析各類食譜的材料、製作步驟與烹飪技巧。  
     請根據我提供的條件與資訊，判斷並回答「true」或「false」，以明確回應該問題。  
-    回答時請僅輸出「true」或「false」。。請勿輸出其他文字。不要加上任何解釋。
+    回答時請僅輸出「true」或「false」。請勿輸出其他文字，不要加上任何解釋。
     """
 
     user_prompt = f"""
@@ -45,7 +44,7 @@ def generate_true_false(recipe, question):
 
 
     response = client.chat.completions.create(
-        model=model,
+        model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -61,7 +60,7 @@ def generate_true_false(recipe, question):
     match = re.search(r'\b(true|false)\b', raw_output)
 
     if match:
-        print(match.group(1))
+        print(f"【{recipe['recipe_name']}】: {match.group(1)}")
         return match.group(1)
     else:
         print("⚠️ match 失敗")
@@ -102,12 +101,12 @@ def generate(recipe, question):
 
 
     response = client.chat.completions.create(
-        model=model,
+        model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=1,
+        temperature=0,
         max_tokens=300
     )
 
@@ -160,12 +159,12 @@ def rewrite_answer(question, first_generation):
     """
 
     response = client.chat.completions.create(
-        model=model,
+        model=model_name,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=1,
+        temperature=0,
         max_tokens=300
     )
 
@@ -173,6 +172,7 @@ def rewrite_answer(question, first_generation):
     return thoughts
 
 def generate_result(recipe, question):
+    print("=====================================")
     print(f"🔍分析食譜: {recipe['recipe_name']}\n")
     first_genreation = generate(recipe, question)
     print("💭初步依據食譜的回答:")
@@ -181,7 +181,6 @@ def generate_result(recipe, question):
     result = rewrite_answer(question, first_genreation)
     print("\n✨精簡後的回答:")
     print(result)
-    print("=====================================")
     
     return result
 

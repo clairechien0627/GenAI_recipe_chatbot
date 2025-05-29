@@ -12,7 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import START, END, StateGraph
 
-model = "llama3-8b-8192"
+model_name = "llama3-8b-8192"
 def meta_func(obj: dict, seq_num: int) -> dict:
     return {
         "seq_num":            seq_num,
@@ -75,19 +75,23 @@ class RecipeRatingItem(BaseModel):
     title: str = Field(..., description="食譜名稱")
     score: int = Field(..., ge=1, le=3, description="食譜評分，1 到 3 分")
     reason: str = Field(..., description="給出這個評分的簡短理由")
-    image_url: str = ""
+    image_url: str = Field("", description="食譜圖片的網址")
+    recipe_link: str = Field("", description="食譜原始連結")
 
+    class Config:
+        extra = "allow"
 
 class RecipeRatings(BaseModel):
     ratings: List[RecipeRatingItem]
 
 def build_workflow(vectorstore: Chroma, k: int):
-    llm = init_chat_model(model, model_provider="groq")
+    llm = init_chat_model(model_name, model_provider="groq")
     retriever = vectorstore.as_retriever(search_kwargs={"k": k})  # 取前 k 筆
 
     system_prompt = """
     你是一位專業的食譜分析師，熟悉各類食材與烹飪技巧。  
     請根據使用者提供的條件，為檢索到的每道食譜打分（1~3 分，1 代表不符合，2 代表部分符合，3 代表符合），並簡要說明打分的理由。  
+    只要有關聯都屬於部分符合，對於符合條件不必太嚴謹。
     分數越高代表越符合條件，不須分析與條件無關的內容。  
     請只回傳 JSON 格式，內容包含 title（食譜名稱）、score（分數）、reason（理由）。  
     請使用繁體中文回答理由。
@@ -102,7 +106,8 @@ def build_workflow(vectorstore: Chroma, k: int):
 
     {recipe_content}
 
-    請直接輸出符合 JSON 格式的評分結果，請使用繁體中文回答理由。
+    請只回傳 JSON 格式，內容包含score（分數）、reason（理由）。  
+    請使用繁體中文回答理由。
     """
 
     # 評分用 Prompt
@@ -129,7 +134,8 @@ def build_workflow(vectorstore: Chroma, k: int):
         for doc in documents:
             recipe_content = doc.page_content
             title = doc.metadata.get("recipe_name", "未知食譜")
-            image_url = doc.metadata.get("image_url", "")  # 取得 image_url
+            image_url = doc.metadata.get("image_url", "")
+            recipe_link = doc.metadata.get("recipe_link", "")  # 取得連結
 
             try:
                 result = rating_chain.invoke({
@@ -138,11 +144,20 @@ def build_workflow(vectorstore: Chroma, k: int):
                     "question": state["question"]
                 })
 
-                # 補上 image_url
                 if isinstance(result, RecipeRatingItem):
-                    result.image_url = image_url
-                else:
-                    result = RecipeRatingItem(**result, image_url=image_url)
+                    result = result.model_copy(update={
+                        "title": title,
+                        "image_url": image_url,
+                        "recipe_link": recipe_link
+                    })
+                elif isinstance(result, dict):
+                    result.setdefault("reason", "模型未提供理由")
+                    result = RecipeRatingItem(
+                        title=title,
+                        image_url=image_url,
+                        recipe_link=recipe_link,
+                        **result
+                    )
 
                 ratings.append(result)
 
@@ -151,14 +166,23 @@ def build_workflow(vectorstore: Chroma, k: int):
                 ratings.append(RecipeRatingItem(
                     title=title,
                     score=0,
-                    image_url=image_url
+                    reason="模型評分失敗，無法提供理由。",
+                    image_url=image_url,
+                    recipe_link=recipe_link
                 ))
+
+
+            print(f"【{title}】")
+            print(f"⭐ 評分：{result.score}")
+            print(f"💬 理由：{result.reason}")
+            print("=====================================")
 
         return {
             "documents": documents,
             "question": state["question"],
             "generation": RecipeRatings(ratings=ratings).model_dump()
         }
+
 
 
     workflow.add_node("retrieve", retrieve)
